@@ -1,66 +1,11 @@
-## Foundry
+### ERC-404
+ - `ERC404` is a hybrid token standard that has functionality like `ERC20` and `ERC721`;
+ - if u buy a full token `ERC404` not in fraction (0.1, 0.2, 0.3 and so on), you will receive 1 `ERC-721` version of `ERC404`
+ - but if u buy a fraction or below 1 (0.1, 0.2 and so on) of `ERC404`, u will not get any `ERC721` but u will get an `ERC20` version of `ERC404` 
+ - if you mint/buy a certain amount `ERC721` of `ERC404`, then u need to burn a X amount `ERC20` of `ERC404`
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
 
-Foundry consists of:
-
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
-
-## Documentation
-
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
-
-```shell
-$ forge build
-```
-
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+## The type of the token 
+ - the type of token will be determined by the amount of token that u holding in your wallet
+ - if ur amount of `ERC404` in your wallet is (1), that means u holding 1 NFT
+ - if the amount of `ERC404` that u holding is (1.5 / 3.4) that means u holding 1 NFT or 3 NFT `(ERC721)` and 0.5 or 0.4 token `(ERC20)`
