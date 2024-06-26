@@ -9,8 +9,8 @@ contract EscrowTest is Test {
     Escrow escrow;
     DeployEscrow deployer;
 
-    address USER = makeAddr("USER");
-    address DEVELOPER = makeAddr("DEV");
+    address payable USER = payable(makeAddr("USER"));
+    address payable DEVELOPER = payable(makeAddr("DEV"));
     uint256 constant PROJECT_FEE = 0.05 ether;
 
     bytes32 public hashMsg = keccak256("HASHED_MESSAGE");

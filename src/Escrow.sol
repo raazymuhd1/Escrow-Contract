@@ -21,6 +21,9 @@ contract Escrow {
     error Escrow_ProjectNotCompletedOrCanceled();
     error Escrow_DeadlineIsOver();
     error Escrow_NotProjectsOwner();
+    error Escrow_NoProjectOwned();
+    error Escrow_ProjectNotOverYet();
+    error Escrow_RefundFailed();
 
     // ---------------- STATE VARIABLES ---------------------
    uint256 private constant PROJECT_FEE = 0.02 ether;
@@ -33,6 +36,7 @@ contract Escrow {
    event ProjectCreated(address indexed owner_, Project indexed project);
    event FundReleased(address indexed realeasedTo, uint256 indexed amount);
    event ProjectStarted(address owner, ProjectState state);
+   event ProjectHasBeenRefunded(address projectOwner, uint256 budget);
 
    constructor(address _owner) {
       s_owner = _owner;
@@ -44,7 +48,7 @@ contract Escrow {
     // ------------------ STRUCT ------------------------
    struct Project {
        bytes32 projectId;
-       address owner;
+       address payable owner;
        address developer;
        string title;
        string description;
@@ -73,7 +77,7 @@ contract Escrow {
          
           project = Project({
           projectId: projectDetails.projectId,
-          owner: msg.sender,
+          owner: payable(msg.sender),
           developer: msg.sender,
           title: projectDetails.title,
           description: projectDetails.description,
@@ -135,7 +139,15 @@ contract Escrow {
 
    
    function cancelAndRefund() external returns(bool refunded) {
+       Project memory project = getProjectByOwner(msg.sender);
+       if(project.owner == address(0)) revert Escrow_NoProjectOwned();
+       if(block.timestamp < project.deadline || project.state == ProjectState.Completed) revert Escrow_ProjectNotOverYet();
+       project.budget = 0;
+       ( refunded, ) = project.owner.call{value: project.budget}("");
        
+       if(!refunded) revert Escrow_RefundFailed();
+       emit ProjectHasBeenRefunded(project.owner, project.budget);
+       refunded;
    }
 
    function setState() external returns(bool stateSet) {
@@ -154,8 +166,8 @@ contract Escrow {
       balance = address(this).balance;
    }
 
-   function getProjectByOwner() public view returns(Project memory project) {
-      
+   function getProjectByOwner(address _owner) public view returns(Project memory project) {
+       project = s_project[_owner];
    }
 
   function geProjectState() public view returns(ProjectState state) {
