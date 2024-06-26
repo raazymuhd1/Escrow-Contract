@@ -1,11 +1,12 @@
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.17;
 
 /**
  * @title Escrow Contract
+ * @notice THIS CONTRACT IS NOT PRODUCTION READY YET, WILL BE TESTED IN THE FUTURE
  * @dev This contract provides a basic escrow mechanism, allowing two parties to securely engage in transactions with each other.
- *      It ensures that the seller receives payment only after the buyer confirms receipt of the item or service.
- *      The contract is designed to be generic and can be used for various types of transactions where escrow is required.
- *      It supports depositing funds into escrow, releasing funds to the seller, and refunding the buyer.
+ *      It ensures that the developer receives payment only after the client confirms the project is completed.
+ *      The contract is designed to be use for transactions between client and developer.
+ *      It supports depositing funds into escrow, releasing funds to the developer, and refunding the client.
  *      This contract does not inherently support dispute resolution and assumes that any disputes will be resolved externally.
  */
 
@@ -70,7 +71,7 @@ contract Escrow {
 
     // ----------------------- EXTERNAL & INTERNAL ---------------------------
 
-    function _assignProject(Project calldata projectDetails) internal returns(Project memory project) {
+    function _assignProject(Project calldata projectDetails) private returns(Project memory project) {
          
           project = Project({
           projectId: projectDetails.projectId,
@@ -103,6 +104,17 @@ contract Escrow {
    }
 
     /**
+        @dev checking whether the deadline is over or not
+        @param project - The project based on caller;
+     */
+    function _isDeadlineOver(Project memory project) private view returns(bool isOver) {
+          if(block.timestamp >= project.deadline) {
+             isOver = true;
+          }
+          isOver = false;
+    }
+
+    /**
      * @dev this function only can be call by contract owner to release the project funds after client confirm that project is completed
      * @param owner_ - project owner address
      * @param releaseTo - to where the funds should release to
@@ -110,7 +122,7 @@ contract Escrow {
    function releaseFunds(address owner_, address payable releaseTo) external payable OnlyOwner StateCompleted returns(bool released) {
        Project memory project = s_project[owner_]; 
        bool fundReleased;
-       if(block.timestamp >= project.deadline) revert Escrow_DeadlineIsOver();
+       if(_isDeadlineOver(project) == true) revert Escrow_DeadlineIsOver();
        if(project.budget != 0 && releaseTo != address(0)) { 
            ( fundReleased, ) = payable(releaseTo).call{value: project.budget}("");
        }
@@ -127,8 +139,10 @@ contract Escrow {
        s_treasuryWallet = newWallet;
     }
 
-
-   function getBalance() external returns(uint256 balance) {
+    /**
+      @dev get total funds in this contract
+     */
+   function getBalance() external view returns(uint256 balance) {
       balance = address(this).balance;
    }
 

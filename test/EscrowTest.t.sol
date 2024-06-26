@@ -30,7 +30,8 @@ contract EscrowTest is Test {
             developer: DEVELOPER,
             title: "make a presale contract",
             description: "Requirements: make a presale contract",
-            budget: 0.5 ether
+            budget: 0.5 ether,
+            deadline: 7 days
         });
         (bool status, Escrow.Project memory project ) = escrow.openProject{value: PROJECT_FEE}(newProject);
         uint256 balance = escrow.getBalance();
