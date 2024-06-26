@@ -1,40 +1,48 @@
-// // SPDX-Licenses-Identifier: MIT;
-// pragma solidity ^0.8.13;
+// SPDX-Licenses-Identifier: MIT;
+pragma solidity ^0.8.13;
 
-// import { Test, console } from "forge-std/Test.sol";
-// import { DeployEscrow } from "../script/DeployEscrow.s.sol";
-// import { Escrow } from "../src/Escrow.sol";
+import { Test, console } from "forge-std/Test.sol";
+import { DeployEscrow } from "../script/DeployEscrow.s.sol";
+import { Escrow } from "../src/Escrow.sol";
 
-// contract EscrowTest is Test {
-//     Escrow escrow;
-//     DeployEscrow deployer;
+contract EscrowTest is Test {
+    Escrow escrow;
+    DeployEscrow deployer;
 
-//     address USER = makeAddr("USER");
-//     uint256 constant PROJECT_FEE = 0.05 ether;
+    address USER = makeAddr("USER");
+    address DEVELOPER = makeAddr("DEV");
+    uint256 constant PROJECT_FEE = 0.05 ether;
 
-//     function setUp() public {
-//         deployer = new DeployEscrow();
-//         escrow = deployer.run();
+    bytes32 public hashMsg = keccak256("HASHED_MESSAGE");
 
-//         vm.deal(USER, 10 ether);
-//     }
+    function setUp() public {
+        deployer = new DeployEscrow();
+        escrow = deployer.run();
 
-//     function test_createProject() public {
-//         Escrow.Project memory newProject = Escrow.Project({
-//             projectId: 0,
-//             owner: msg.sender,
-//             title: "make a presale contract",
-//             description: "Requirements: make a presale contract",
-//             budget: 0.5 ether
-//         });
+        vm.deal(USER, 10 ether);
+    }
 
-//         vm.startPrank(USER);
-//         (bool status, Escrow.Project memory project ) = escrow.openProject{value: PROJECT_FEE}(newProject);
-//         uint256 balance = escrow.getBalance();
-//         vm.stopPrank();
-//         console.log(balance);
+    function test_createProject() public {
+        vm.startPrank(USER);
+        Escrow.Project memory newProject = Escrow.Project({
+            projectId: 0,
+            owner: USER,
+            developer: DEVELOPER,
+            title: "make a presale contract",
+            description: "Requirements: make a presale contract",
+            budget: 0.5 ether
+        });
+        (bool status, Escrow.Project memory project ) = escrow.openProject{value: PROJECT_FEE}(newProject);
+        uint256 balance = escrow.getBalance();
+        vm.stopPrank();
+        console.log(balance);
 
-//         assert(status == true);
-//         assert(balance > 0);
-//     }
-// }
+        assert(status == true);
+        assert(balance > 0);
+    }
+
+    function test_messageHashed() public view returns(bytes32) {
+        console.logBytes32(hashMsg);
+        return hashMsg;
+    }
+}

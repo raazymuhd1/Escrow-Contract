@@ -20,7 +20,7 @@ contract Escrow {
     error Escrow_ProjectNotCompleted();
 
     // STATE VARIABLES
-   address private immutable i_treasuryWallet;
+   address private s_treasuryWallet;
    uint256 private constant PROJECT_FEE = 0.02 ether;
    ProjectState private s_projectState = ProjectState.Started;
 
@@ -31,7 +31,7 @@ contract Escrow {
    event FundReleased(address indexed realeasedTo, uint256 indexed amount);
 
    constructor(address _owner) {
-      i_treasuryWallet = _owner;
+      s_treasuryWallet = _owner;
    }
 
     receive() external payable {}
@@ -54,7 +54,7 @@ contract Escrow {
 
     // MODIFIERS ***********************
    modifier OnlyOwner() {
-       if(msg.sender != i_treasuryWallet) revert Escrow_NotOwner();
+       if(msg.sender != s_treasuryWallet) revert Escrow_NotOwner();
        _;
    }
 
@@ -99,9 +99,18 @@ contract Escrow {
        released = fundReleased;
    }
 
+   /**
+    * 
+    */
+    function changeTreasuryWallet(address newWallet) external OnlyOwner {
+       s_treasuryWallet = newWallet;
+    }
+
+
    function getBalance() external returns(uint256 balance) {
       balance = address(this).balance;
    }
+
 
 
 }
