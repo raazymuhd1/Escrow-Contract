@@ -18,13 +18,13 @@ contract Escrow {
     error Escrow_OpenProjectFailed();
     error Escrow_NotEnoughFee();
     error Escrow_FundsNotRelased();
-    error Escrow_ProjectNotCompleted();
+    error Escrow_ProjectNotCompletedOrCanceled();
     error Escrow_DeadlineIsOver();
+    error Escrow_NotProjectsOwner();
 
     // ---------------- STATE VARIABLES ---------------------
-   address private s_treasuryWallet;
    uint256 private constant PROJECT_FEE = 0.02 ether;
-   ProjectState private s_projectState = ProjectState.Started;
+   address private s_owner;
 
     // ------------------- MAPPINGS ------------------------
    mapping(address projectOwner => Project) private s_project;
@@ -32,9 +32,10 @@ contract Escrow {
 //   ----------------------- EVENTS --------------------------
    event ProjectCreated(address indexed owner_, Project indexed project);
    event FundReleased(address indexed realeasedTo, uint256 indexed amount);
+   event ProjectStarted(address owner, ProjectState state);
 
    constructor(address _owner) {
-      s_treasuryWallet = _owner;
+      s_owner = _owner;
    }
 
     receive() external payable {}
@@ -42,13 +43,14 @@ contract Escrow {
 
     // ------------------ STRUCT ------------------------
    struct Project {
-       uint16 projectId;
+       bytes32 projectId;
        address owner;
        address developer;
        string title;
        string description;
        uint256 budget;
        uint256 deadline;
+       ProjectState state;
    }
 
    enum ProjectState {
@@ -58,13 +60,9 @@ contract Escrow {
    } 
 
     // MODIFIERS ***********************
-   modifier OnlyOwner() {
-       if(msg.sender != s_treasuryWallet) revert Escrow_NotOwner();
-       _;
-   }
-
    modifier StateCompleted() {
-      if(s_projectState != ProjectState.Completed) revert Escrow_ProjectNotCompleted();
+      Project memory project = s_project[msg.sender];
+      if(project.state != ProjectState.Completed || project.state == ProjectState.Canceled) revert Escrow_ProjectNotCompletedOrCanceled();
       _;
    }
    
@@ -80,7 +78,8 @@ contract Escrow {
           title: projectDetails.title,
           description: projectDetails.description,
           budget: s_project[msg.sender].budget + msg.value,
-          deadline: projectDetails.deadline
+          deadline: projectDetails.deadline,
+          state: projectDetails.state
        });
 
     }
@@ -114,12 +113,14 @@ contract Escrow {
           isOver = false;
     }
 
+
+
     /**
      * @dev this function only can be call by contract owner to release the project funds after client confirm that project is completed
      * @param owner_ - project owner address
      * @param releaseTo - to where the funds should release to
      */
-   function releaseFunds(address owner_, address payable releaseTo) external payable OnlyOwner StateCompleted returns(bool released) {
+   function releaseFunds(address owner_, address payable releaseTo) external payable StateCompleted returns(bool released) {
        Project memory project = s_project[owner_]; 
        bool fundReleased;
        if(_isDeadlineOver(project) == true) revert Escrow_DeadlineIsOver();
@@ -132,12 +133,19 @@ contract Escrow {
        released = fundReleased;
    }
 
-   /**
-    * 
-    */
-    function changeTreasuryWallet(address newWallet) external OnlyOwner {
-       s_treasuryWallet = newWallet;
-    }
+   
+   function cancelAndRefund() external returns(bool refunded) {
+       
+   }
+
+   function setState() external returns(bool stateSet) {
+      Project memory project = s_project[msg.sender];
+      if(msg.sender != project.owner) revert Escrow_NotProjectsOwner();
+
+      project.state = ProjectState.Started;
+      stateSet = true;
+      emit ProjectStarted(msg.sender, project.state);
+   }
 
     /**
       @dev get total funds in this contract
@@ -146,6 +154,13 @@ contract Escrow {
       balance = address(this).balance;
    }
 
+   function getProjectByOwner() public view returns(Project memory project) {
+      
+   }
 
+  function geProjectState() public view returns(ProjectState state) {
+    Project memory _project = s_project[msg.sender];
+    state = _project.state;
+  }
 
 }
