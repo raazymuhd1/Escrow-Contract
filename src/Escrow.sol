@@ -16,17 +16,19 @@ contract Escrow {
     error Escrow_InvalidAddress();
     error Escrow_OpenProjectFailed();
     error Escrow_NotEnoughFee();
-    error Escrow_FundNotRelased();
+    error Escrow_FundsNotRelased();
     error Escrow_ProjectNotCompleted();
+    error Escrow_DeadlineIsOver();
 
-    // STATE VARIABLES
+    // ---------------- STATE VARIABLES ---------------------
    address private s_treasuryWallet;
    uint256 private constant PROJECT_FEE = 0.02 ether;
    ProjectState private s_projectState = ProjectState.Started;
 
+    // ------------------- MAPPINGS ------------------------
    mapping(address projectOwner => Project) private s_project;
 
-//    EVENTS
+//   ----------------------- EVENTS --------------------------
    event ProjectCreated(address indexed owner_, Project indexed project);
    event FundReleased(address indexed realeasedTo, uint256 indexed amount);
 
@@ -37,6 +39,7 @@ contract Escrow {
     receive() external payable {}
     // fallback() external payable {}
 
+    // ------------------ STRUCT ------------------------
    struct Project {
        uint16 projectId;
        address owner;
@@ -44,6 +47,7 @@ contract Escrow {
        string title;
        string description;
        uint256 budget;
+       uint256 deadline;
    }
 
    enum ProjectState {
@@ -63,21 +67,37 @@ contract Escrow {
       _;
    }
    
-   function openProject(Project memory projectDetails) external payable returns(bool, Project memory) {
-       if(msg.value <= 0 || msg.value <= PROJECT_FEE) {
-           revert Escrow_NotEnoughFee();
-       } 
-       if(msg.sender == address(0)) revert Escrow_InvalidAddress();
 
-       s_project[msg.sender] = Project({
+    // ----------------------- EXTERNAL & INTERNAL ---------------------------
+
+    function _assignProject(Project calldata projectDetails) internal returns(Project memory project) {
+         
+          project = Project({
           projectId: projectDetails.projectId,
           owner: msg.sender,
           developer: msg.sender,
           title: projectDetails.title,
           description: projectDetails.description,
-          budget: s_project[msg.sender].budget + msg.value
+          budget: s_project[msg.sender].budget + msg.value,
+          deadline: projectDetails.deadline
        });
 
+    }
+
+    /**
+        @dev this function uses for open a project between client and developer
+        @param projectDetails - project details
+        @return bool - only returns true if project creation is succeeded
+        @return Project - returns the project that was created
+     */
+
+   function openProject(Project calldata projectDetails) external payable returns(bool, Project memory) {
+       if(msg.value <= 0 || msg.value <= PROJECT_FEE) {
+           revert Escrow_NotEnoughFee();
+       } 
+       if(msg.sender == address(0)) revert Escrow_InvalidAddress();
+        // assigns a project 
+       s_project[msg.sender] = _assignProject(projectDetails);
        emit ProjectCreated(msg.sender, s_project[msg.sender]); 
        return (true, s_project[msg.sender]);
    }
@@ -88,14 +108,15 @@ contract Escrow {
      * @param releaseTo - to where the funds should release to
      */
    function releaseFunds(address owner_, address payable releaseTo) external payable OnlyOwner StateCompleted returns(bool released) {
-       uint256 projectFunds = s_project[owner_].budget; 
+       Project memory project = s_project[owner_]; 
        bool fundReleased;
-       if(projectFunds != 0 && releaseTo != address(0)) { 
-           ( fundReleased, ) = payable(releaseTo).call{value: projectFunds}("");
+       if(block.timestamp >= project.deadline) revert Escrow_DeadlineIsOver();
+       if(project.budget != 0 && releaseTo != address(0)) { 
+           ( fundReleased, ) = payable(releaseTo).call{value: project.budget}("");
        }
-       if(!fundReleased) revert Escrow_FundNotRelased();
+       if(!fundReleased) revert Escrow_FundsNotRelased();
 
-       emit FundReleased(releaseTo, projectFunds);
+       emit FundReleased(releaseTo, project.budget);
        released = fundReleased;
    }
 
