@@ -11,7 +11,9 @@ contract EscrowTest is Test {
 
     address payable USER = payable(makeAddr("USER"));
     address payable DEVELOPER = payable(makeAddr("DEV"));
-    uint256 constant PROJECT_FEE = 0.05 ether;
+    uint256 constant PROJECT_FEE = 0.02 ether;
+    uint256 constant TEST_BUDGET = 1 ether;
+    uint256 constant TEST_DEADLINE = 6 days;
 
     bytes32 public hashMsg = keccak256("HASHED_MESSAGE");
 
@@ -23,24 +25,31 @@ contract EscrowTest is Test {
     }
 
     function test_createProject() public {
+        bytes32 projectId = keccak256(abi.encodePacked(USER, DEVELOPER, TEST_BUDGET, TEST_DEADLINE));
+
         vm.startPrank(USER);
         Escrow.Project memory newProject = Escrow.Project({
-            projectId: 0,
+            projectId: projectId,
             owner: USER,
             developer: DEVELOPER,
             title: "make a presale contract",
             description: "Requirements: make a presale contract",
-            budget: 0.5 ether,
-            deadline: 7 days,
+            budget: TEST_BUDGET,
+            deadline: TEST_DEADLINE,
             state: Escrow.ProjectState.Started
         });
-        (bool status, Escrow.Project memory project ) = escrow.openProject{value: PROJECT_FEE}(newProject);
-        uint256 balance = escrow.getBalance();
-        vm.stopPrank();
-        console.log(balance);
 
-        assert(status == true);
-        assert(balance > 0);
+        uint256 balanceBefore = escrow.getBalance();
+        console.log(balanceBefore);
+        (bool projectCreated, ) = escrow.openProject{value: TEST_BUDGET + PROJECT_FEE}(newProject);
+        uint256 balanceAfter = escrow.getBalance();
+        console.log(balanceAfter);
+        console.log(projectCreated);
+        console.log(balanceAfter);
+        vm.stopPrank();
+
+        assert(projectCreated == true);
+        assert(balanceAfter > 0);
     }
 
     function test_messageHashed() public view returns(bytes32) {

@@ -1,11 +1,30 @@
-### ERC-404
- - `ERC404` is a hybrid token standard that has functionality like `ERC20` and `ERC721`;
- - if u buy a full token `ERC404` not in fraction (0.1, 0.2, 0.3 and so on), you will receive 1 `ERC-721` version of `ERC404`
- - but if u buy a fraction or below 1 (0.1, 0.2 and so on) of `ERC404`, u will not get any `ERC721` but u will get an `ERC20` version of `ERC404` 
- - if you mint/buy a certain amount `ERC721` of `ERC404`, then u need to burn a X amount `ERC20` of `ERC404`
+## Escrow Contract
+
+**Description** This is just a basic `Escrow` contract for `Escrow` services for client and developer. Client made a deposit amount based on agreement with the developer to an `Escrow` contract, And it will be released to the developer once the job completed. No one has access to the funds in the contract not even the contract owner, Funds will only be released once the project completed and client has been confirmed. Thus, the funds will be transfered to the `developer` accounts.
+
+ Otherwise the funds will be refunded to the client if the deadline has passed.
 
 
-## The type of the token 
- - the type of token will be determined by the amount of token that u holding in your wallet
- - if ur amount of `ERC404` in your wallet is (1), that means u holding 1 NFT
- - if the amount of `ERC404` that u holding is (1.5 / 3.4) that means u holding 1 NFT or 3 NFT `(ERC721)` and 0.5 or 0.4 token `(ERC20)`
+### Quick Start
+
+ **Clone this repository by run the following command:**
+ ```shell
+    git clone https://github.com/raazymuhd1/Escrow-Contract.git
+ ```
+
+ **Install all dependencies:**
+ ```shell
+   make install
+ ```
+
+ **Compile the contracts**
+ ```shell
+    make build 
+        OR 
+    forge build
+ ```
+
+ **Run Test to create a project**
+ ```shell
+    forge test --mt test_createProject -vvv
+ ```

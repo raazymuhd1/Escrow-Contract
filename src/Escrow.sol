@@ -24,9 +24,10 @@ contract Escrow {
     error Escrow_NoProjectOwned();
     error Escrow_ProjectNotOverYet();
     error Escrow_RefundFailed();
+    error Escrow_BudgetDepositFailed();
 
     // ---------------- STATE VARIABLES ---------------------
-   uint256 private constant PROJECT_FEE = 0.02 ether;
+   uint256 private constant ESCROW_FEE = 0.02 ether;
    address private s_owner;
 
     // ------------------- MAPPINGS ------------------------
@@ -49,7 +50,7 @@ contract Escrow {
    struct Project {
        bytes32 projectId;
        address payable owner;
-       address developer;
+       address payable developer;
        string title;
        string description;
        uint256 budget;
@@ -65,7 +66,7 @@ contract Escrow {
 
     // MODIFIERS ***********************
    modifier StateCompleted() {
-      Project memory project = s_project[msg.sender];
+      Project memory project = getProjectByOwner(msg.sender);
       if(project.state != ProjectState.Completed || project.state == ProjectState.Canceled) revert Escrow_ProjectNotCompletedOrCanceled();
       _;
    }
@@ -73,15 +74,15 @@ contract Escrow {
 
     // ----------------------- EXTERNAL & INTERNAL ---------------------------
 
-    function _assignProject(Project calldata projectDetails) private returns(Project memory project) {
+    function _assignProject(Project calldata projectDetails) private view returns(Project memory project) {
          
           project = Project({
           projectId: projectDetails.projectId,
           owner: payable(msg.sender),
-          developer: msg.sender,
+          developer: payable(projectDetails.developer),
           title: projectDetails.title,
           description: projectDetails.description,
-          budget: s_project[msg.sender].budget + msg.value,
+          budget: projectDetails.budget,
           deadline: projectDetails.deadline,
           state: projectDetails.state
        });
@@ -96,10 +97,14 @@ contract Escrow {
      */
 
    function openProject(Project calldata projectDetails) external payable returns(bool, Project memory) {
-       if(msg.value <= 0 || msg.value <= PROJECT_FEE) {
-           revert Escrow_NotEnoughFee();
-       } 
+       uint256 projectBudget = projectDetails.budget + ESCROW_FEE;
+       if(msg.value <= 0 || msg.value < projectBudget) revert Escrow_NotEnoughFee();
        if(msg.sender == address(0)) revert Escrow_InvalidAddress();
+      // deposit budget
+      (bool deposited, ) = payable(address(this)).call{value: projectBudget}("");  
+       
+       if(!deposited) revert Escrow_BudgetDepositFailed();
+
         // assigns a project 
        s_project[msg.sender] = _assignProject(projectDetails);
        emit ProjectCreated(msg.sender, s_project[msg.sender]); 
@@ -122,18 +127,20 @@ contract Escrow {
     /**
      * @dev this function only can be call by contract owner to release the project funds after client confirm that project is completed
      * @param owner_ - project owner address
-     * @param releaseTo - to where the funds should release to
      */
-   function releaseFunds(address owner_, address payable releaseTo) external payable StateCompleted returns(bool released) {
-       Project memory project = s_project[owner_]; 
+   function releaseFunds(address owner_, address dev_) external payable StateCompleted returns(bool released) {
+       Project memory project = getProjectByOwner(owner_); 
        bool fundReleased;
-       if(_isDeadlineOver(project) == true) revert Escrow_DeadlineIsOver();
-       if(project.budget != 0 && releaseTo != address(0)) { 
-           ( fundReleased, ) = payable(releaseTo).call{value: project.budget}("");
-       }
-       if(!fundReleased) revert Escrow_FundsNotRelased();
 
-       emit FundReleased(releaseTo, project.budget);
+       if(_isDeadlineOver(project) == true) revert Escrow_DeadlineIsOver();
+       if(project.budget != 0 && owner_ != address(0) && msg.sender == project.owner) { 
+           ( fundReleased, ) = payable(dev_).call{value: project.budget}("");
+         //   resetting project's budget
+           project.budget = 0;
+           emit FundReleased(dev_, project.budget);
+       }
+
+       if(!fundReleased) revert Escrow_FundsNotRelased();
        released = fundReleased;
    }
 
@@ -168,6 +175,11 @@ contract Escrow {
 
    function getProjectByOwner(address _owner) public view returns(Project memory project) {
        project = s_project[_owner];
+   }
+
+   function getProjectBudgets() external view returns(uint256 budget_) {
+      Project memory project = getProjectByOwner(msg.sender);
+      budget_ = project.budget;
    }
 
   function geProjectState() public view returns(ProjectState state) {
