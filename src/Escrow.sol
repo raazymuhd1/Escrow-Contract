@@ -144,6 +144,18 @@ contract Escrow {
        released = fundReleased;
    }
 
+   function confirmProjectIsCompleted() external returns(bool confirmed) {
+        Project memory project = getProjectByOwner(msg.sender);
+        if(msg.sender != project.owner) revert Escrow_NotOwner();
+        if(project.state == ProjectState.Completed) {
+            revert Escrow_ProjectHasBeenCompleted();
+            confirmed = false;
+        }
+        
+        project.state = ProjectState.Completed;
+        confirmed = true
+   }
+
    
    function cancelAndRefund() external returns(bool refunded) {
        Project memory project = getProjectByOwner(msg.sender);
