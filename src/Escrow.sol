@@ -25,6 +25,7 @@ contract Escrow {
     error Escrow_ProjectNotOverYet();
     error Escrow_RefundFailed();
     error Escrow_BudgetDepositFailed();
+    error Escrow_ProjectHasBeenCompleted();
 
     // ---------------- STATE VARIABLES ---------------------
    uint256 private constant ESCROW_FEE = 0.02 ether;
