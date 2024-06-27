@@ -151,9 +151,9 @@ contract Escrow {
             revert Escrow_ProjectHasBeenCompleted();
             confirmed = false;
         }
-        
+
         project.state = ProjectState.Completed;
-        confirmed = true
+        confirmed = true;
    }
 
    
