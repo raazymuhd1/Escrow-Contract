@@ -2,9 +2,38 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+ffi = false # enabling this would allow arbitrary code/program being executed in our computer
+gas_reports = ["Escrow"]
 
-remappings = ["forge-std/=lib/forge-std/src/", "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"]
+remappings = [
+    "forge-std/=lib/forge-std/src/", 
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@chainlink/contracts/=lib/chainlink-brownie-contracts/contracts/"
+    ]
 
 [rpc_endpoints]
-etherscan = ""
+sepolia = "${SEPOLIA_RPC_URL}"
+
+[etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
+
+# Contract verification settings
+[profile.default.verify]
+constructor_args = ["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"]
+num_of_optimizations = 200
+
+[doc]
+out = "docs"
+title = "Escrow Docs"
+repository = "https://github.com/raazymuhd1/Escrow-Contract"
+
+[fmt]
+params_first = true
+number_underscore = "thousands"
+
+[fmt.rs]
+sort_imports = true
+
+
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
