@@ -12,10 +12,14 @@ import {SafeERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solid
 contract Multichain is CCIPReceiver, OwnerIsCreator {
     using SafeERC20 for IERC20;
 
+    uint256[] private s_allowedChains;
     bytes32 private s_lastReceivedMessageId;
     string private s_lastReceivedText;
     IRouterClient private immutable s_router;
     IERC20 private immutable s_linkToken;
+
+    // -------------------------------------------------MAPPINGS-----------------------------------------------
+    // mapping()
 
      event MessageReceived(
         bytes32 indexed messageId, // The unique ID of the message.
