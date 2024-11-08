@@ -12,14 +12,17 @@ import {SafeERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solid
 contract Multichain is CCIPReceiver, OwnerIsCreator {
     using SafeERC20 for IERC20;
 
-    uint256[] private s_allowedChains;
+    error Multichain__InvalidOrNotAllowedSourceChains(uint256 chainId);
+    error Multichain__InvalidOrNotAllowedDestChains(uint256 chainId);
+
     bytes32 private s_lastReceivedMessageId;
     string private s_lastReceivedText;
     IRouterClient private immutable s_router;
     IERC20 private immutable s_linkToken;
 
     // -------------------------------------------------MAPPINGS-----------------------------------------------
-    // mapping()
+    mapping(uint64 => bool) private s_allowedSourceChains;
+    mapping(uint64 => bool) private s_allowedDestinationChains;
 
      event MessageReceived(
         bytes32 indexed messageId, // The unique ID of the message.
@@ -28,14 +31,32 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
         string text // The text that was received.
     );
 
-    constructor(address router_, address linkToken) CCIPReceiver(router_) {
+
+    event MessageSent(
+        bytes32 indexed messageId, // The unique ID of the CCIP message.
+        uint64 indexed destinationChainSelector, // The chain selector of the destination chain.
+        address receiver, // The address of the receiver on the destination chain.
+        string text, // The text being sent.
+        address token, // The token address that was transferred.
+        uint256 tokenAmount, // The token amount that was transferred.
+        address feeToken, // the token address used to pay CCIP fees.
+        uint256 fees // The fees paid for sending the message.
+    );
+
+
+    constructor(address router_, address linkToken, uint256[] memory chainIds) CCIPReceiver(router_) {
         s_router = IRouterClient(router_);
         s_linkToken = IERC20(linkToken);
+        
     }
 
-    // modifier OnlyListedChainAllowed() {
-
-    // }
+    
+    // -------------------------------------------------MODIFIERS-----------------------------------------------
+    modifier OnlyListedChainAllowed(uint64 sourceChain, uint64 destChain) {
+       if(!s_allowedSourceChains[sourceChain]) revert Multichain__InvalidOrNotAllowedSourceChains(sourceChain);
+       if(!s_allowedDestinationChains[destChain]) revert Multichain__InvalidOrNotAllowedDestChains(destChain);
+       _;
+    }
 
        /// handle a received message
     /**
@@ -54,5 +75,7 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
             abi.decode(any2EvmMessage.data, (string))
         );
     }
+
+
 
 }
