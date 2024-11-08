@@ -17,6 +17,8 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
     error MultiChain__InvalidChain(uint64 chainId);
     error MultiChain__AlreadyAllowed(uint64 chainId);
     error MultiChain__InvalidReceiverOrSender(address rcv);
+    error MultiChain__InvalidTokenOrAmount(address token, uint256 amount);
+    error MultiChain__NotEnoughBalance(uint256 bal);
 
     bytes32 private s_lastReceivedMessageId;
     string private s_lastReceivedText;
@@ -89,7 +91,50 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
         string calldata text,
         address tokenAddr,
         uint256 tokenAmount
-    ) external returns(bool) {
+    ) external 
+        OnlyListedChainAllowed(uint64(block.chainid), destChain) 
+        OnlyValidReceiver(receiver) 
+        OnlyValidSender(msg.sender) returns(bytes32 msgId) {
+        
+        uint256 contractLinkBalance = s_linkToken.balanceOf(address(this));
+        uint256 userTokenBalance = IERC20(tokenAddr).balanceOf(msg.sender);
+
+        if(tokenAddr == address(0) || tokenAmount == 0) revert MultiChain__InvalidTokenOrAmount(tokenAddr, tokenAmount);
+        if(tokenAmount > userTokenBalance) revert MultiChain__NotEnoughBalance(userTokenBalance);
+
+        // send message with token from EVM to any chain
+        Client.EVM2AnyMessage memory evm2AnyMessage = _buildCCIPMessage(
+            receiver,
+            text,
+            tokenAddr,
+            tokenAmount,
+            address(s_linkToken)
+        );
+
+        IRouterClient router = IRouterClient(this.getRouter());
+        uint256 mssgFees = router.getFee(destChain, evm2AnyMessage);
+
+        if(mssgFees > contractLinkBalance) revert MultiChain__NotEnoughBalance(contractLinkBalance);
+
+        IERC20(tokenAddr).transferFrom(msg.sender, address(this), tokenAmount);
+
+        s_linkToken.approve(address(router), mssgFees); // approving the router to deduct fees from this contract for sending message
+        IERC20(tokenAddr).approve(address(router), tokenAmount); // approving the router to move the token amount from
+
+        msgId = router.ccipSend(destChain, evm2AnyMessage);
+
+        emit MessageSent(
+            msgId,
+            destChain,
+            receiver,
+            text,
+            tokenAddr,
+            tokenAmount,
+            address(s_linkToken),
+            mssgFees
+        );
+
+        return msgId;
 
     }
 
