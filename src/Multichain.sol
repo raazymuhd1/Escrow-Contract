@@ -12,8 +12,11 @@ import {SafeERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solid
 contract Multichain is CCIPReceiver, OwnerIsCreator {
     using SafeERC20 for IERC20;
 
-    error Multichain__InvalidOrNotAllowedSourceChains(uint256 chainId);
-    error Multichain__InvalidOrNotAllowedDestChains(uint256 chainId);
+    error Multichain__InvalidOrNotAllowedSourceChains(uint64 chainId);
+    error Multichain__InvalidOrNotAllowedDestChains(uint64 chainId);
+    error MultiChain__InvalidChain(uint64 chainId);
+    error MultiChain__AlreadyAllowed(uint64 chainId);
+    error MultiChain__InvalidReceiverOrSender(address rcv);
 
     bytes32 private s_lastReceivedMessageId;
     string private s_lastReceivedText;
@@ -58,6 +61,83 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
        _;
     }
 
+    modifier OnlyValidReceiver(address _receiver) {
+        if(_receiver == address(0)) revert MultiChain__InvalidReceiverOrSender(_receiver);
+        _;
+    }
+
+    modifier OnlyValidSender(address _sender) {
+        if(_sender == address(0)) revert MultiChain__InvalidReceiverOrSender(_sender);
+        _;
+    }
+
+     // ------------------------------------------- EXTERNAL & PUBLIC FUNCTIONS ----------------------------------------------
+    function allowedSourceChain(uint64 chainId, bool allowed) external returns(uint64) {
+        _allowedChains(chainId, allowed, s_allowedSourceChains[chainId]);
+    }
+
+    function allowedDestChain(uint64 chainId, bool allowed) external returns(uint64) {
+        _allowedChains(chainId, allowed, s_allowedDestinationChains[chainId]);
+    }
+
+    /**
+        @dev send token along with message to a dest chain
+     */
+    function sendMessagePayWithLink(
+        uint64 destChain,
+        address receiver,
+        string calldata text,
+        address tokenAddr,
+        uint256 tokenAmount
+    ) external returns(bool) {
+
+    }
+
+     // ------------------------------------------- INTERNAL & PRIVATE FUNCTIONS ----------------------------------------------
+    /// @notice Construct a CCIP message.
+    /// @dev This function will create an EVM2AnyMessage struct with all the necessary information for programmable tokens transfer.
+    /// @param _receiver The address of the receiver.
+    /// @param _text The string data to be sent.
+    /// @param _token The token to be transferred.
+    /// @param _amount The amount of the token to be transferred.
+    /// @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
+    /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
+    function _buildCCIPMessage(
+        address _receiver,
+        string calldata _text,
+        address _token,
+        uint256 _amount,
+        address _feeTokenAddress
+    ) private pure returns (Client.EVM2AnyMessage memory) {
+        // Set the token amounts
+        Client.EVMTokenAmount[]
+            memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: _token,
+            amount: _amount
+        });
+        // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message
+        return
+            Client.EVM2AnyMessage({
+                receiver: abi.encode(_receiver), // ABI-encoded receiver address
+                data: abi.encode(_text), // ABI-encoded string
+                tokenAmounts: tokenAmounts, // The amount and type of token being transferred
+                extraArgs: Client._argsToBytes(
+                    // Additional arguments, setting gas limit and allowing out-of-order execution.
+                    // Best Practice: For simplicity, the values are hardcoded. It is advisable to use a more dynamic approach
+                    // where you set the extra arguments off-chain. This allows adaptation depending on the lanes, messages,
+                    // and ensures compatibility with future CCIP upgrades. Read more about it here: https://docs.chain.link/ccip/best-practices#using-extraargs
+                    Client.EVMExtraArgsV2({
+                        gasLimit: 200_000, // Gas limit for the callback on the destination chain
+                        allowOutOfOrderExecution: true // Allows the message to be executed out of order relative to other messages from the same sender
+                    })
+                ),
+                // Set the feeToken to a feeTokenAddress, indicating specific asset will be used for fees
+                feeToken: _feeTokenAddress
+            });
+    }
+
+
        /// handle a received message
     /**
         @notice implementing a message received 
@@ -76,6 +156,10 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
         );
     }
 
-
+    function _allowedChains(uint64 chainId, bool allowed, bool srcOrDest) internal {
+         if(chainId == 0) revert MultiChain__InvalidChain(chainId);
+         if(srcOrDest == allowed) revert MultiChain__AlreadyAllowed(chainId);
+         srcOrDest = allowed;
+    }
 
 }
