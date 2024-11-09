@@ -50,7 +50,7 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
 
 
     constructor(address router_, address linkToken, uint256[] memory chainIds) CCIPReceiver(router_) {
-        s_router = IRouterClient(router_);
+        s_router = IRouterClient(this.getRouter());
         s_linkToken = IERC20(linkToken);
         
     }
@@ -97,10 +97,9 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
         OnlyValidSender(msg.sender) returns(bytes32 msgId) {
         
         uint256 contractLinkBalance = s_linkToken.balanceOf(address(this));
-        uint256 userTokenBalance = IERC20(tokenAddr).balanceOf(msg.sender);
 
         if(tokenAddr == address(0) || tokenAmount == 0) revert MultiChain__InvalidTokenOrAmount(tokenAddr, tokenAmount);
-        if(tokenAmount > userTokenBalance) revert MultiChain__NotEnoughBalance(userTokenBalance);
+        if(tokenAmount > IERC20(tokenAddr).balanceOf(msg.sender)) revert MultiChain__NotEnoughBalance(IERC20(tokenAddr).balanceOf(msg.sender));
 
         // send message with token from EVM to any chain
         Client.EVM2AnyMessage memory evm2AnyMessage = _buildCCIPMessage(
@@ -111,17 +110,16 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
             address(s_linkToken)
         );
 
-        IRouterClient router = IRouterClient(this.getRouter());
-        uint256 mssgFees = router.getFee(destChain, evm2AnyMessage);
+        uint256 mssgFees = s_router.getFee(destChain, evm2AnyMessage);
 
         if(mssgFees > contractLinkBalance) revert MultiChain__NotEnoughBalance(contractLinkBalance);
 
         IERC20(tokenAddr).transferFrom(msg.sender, address(this), tokenAmount);
 
-        s_linkToken.approve(address(router), mssgFees); // approving the router to deduct fees from this contract for sending message
-        IERC20(tokenAddr).approve(address(router), tokenAmount); // approving the router to move the token amount from
+        s_linkToken.approve(address(s_router), mssgFees); // approving the router to deduct fees from this contract for sending message
+        IERC20(tokenAddr).approve(address(s_router), tokenAmount); // approving the router to move the token amount from
 
-        msgId = router.ccipSend(destChain, evm2AnyMessage);
+        msgId = s_router.ccipSend(destChain, evm2AnyMessage);
 
         emit MessageSent(
             msgId,
