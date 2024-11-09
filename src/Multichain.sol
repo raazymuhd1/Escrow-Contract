@@ -136,6 +136,51 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
 
     }
 
+    function sendMessagePayWithNative(
+        uint64 destChain,
+        address receiver,
+        string calldata text,
+        address token,
+        uint256 amount
+    ) external
+        OnlyListedChainAllowed(uint64(block.chainid), destChain) 
+        OnlyValidReceiver(receiver) 
+        OnlyValidSender(msg.sender) returns(bytes32 msgId) {
+
+        if(token == address(0) || amount == 0) revert MultiChain__InvalidTokenOrAmount(token, amount);
+        if(amount > IERC20(token).balanceOf(msg.sender)) revert MultiChain__NotEnoughBalance(IERC20(token).balanceOf(msg.sender));
+        
+          // send message with token from EVM to any chain
+        Client.EVM2AnyMessage memory evm2AnyMessage = _buildCCIPMessage(
+            receiver,
+            text,
+            token,
+            amount,
+            address(s_linkToken)
+        );
+
+        uint256 mssgFees = s_router.getFee(destChain, evm2AnyMessage);
+
+        if(mssgFees > address(this).balance) revert MultiChain__NotEnoughBalance(address(this).balance);
+
+        IERC20(token).approve(address(s_router), amount);
+
+        msgId = s_router.ccipSend{value: mssgFees}(destChain, evm2AnyMessage);
+
+        emit MessageSent(
+            msgId,
+            destChain,
+            receiver,
+            text,
+            token,
+            amount,
+            address(0),
+            mssgFees
+        );
+
+        return msgId;
+    }
+
      // ------------------------------------------- INTERNAL & PRIVATE FUNCTIONS ----------------------------------------------
     /// @notice Construct a CCIP message.
     /// @dev This function will create an EVM2AnyMessage struct with all the necessary information for programmable tokens transfer.
