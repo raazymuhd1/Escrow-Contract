@@ -181,6 +181,14 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
         return msgId;
     }
 
+    function withdrawToken(address to_, uint256 amount, address token) external {
+        uint256 contractBalance = IERC20(token).balanceOf(address(this));
+
+        if(contractBalance < amount || contractBalance == 0) revert MultiChain__NotEnoughBalance(contractBalance);
+
+        IERC20(token).safeTransfer(to_, amount);
+    }
+
      // ------------------------------------------- INTERNAL & PRIVATE FUNCTIONS ----------------------------------------------
     /// @notice Construct a CCIP message.
     /// @dev This function will create an EVM2AnyMessage struct with all the necessary information for programmable tokens transfer.
