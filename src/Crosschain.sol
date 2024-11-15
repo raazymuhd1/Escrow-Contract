@@ -9,16 +9,16 @@ import {IERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity
 import {SafeERC20} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 
-contract Multichain is CCIPReceiver, OwnerIsCreator {
+contract Crosschain is CCIPReceiver, OwnerIsCreator {
     using SafeERC20 for IERC20;
 
-    error Multichain__InvalidOrNotAllowedSourceChains(uint64 chainId);
-    error Multichain__InvalidOrNotAllowedDestChains(uint64 chainId);
-    error MultiChain__InvalidChain(uint64 chainId);
-    error MultiChain__AlreadyAllowed(uint64 chainId);
-    error MultiChain__InvalidReceiverOrSender(address rcv);
-    error MultiChain__InvalidTokenOrAmount(address token, uint256 amount);
-    error MultiChain__NotEnoughBalance(uint256 bal);
+    error Crosschain__InvalidOrNotAllowedSourceChains(uint64 chainId);
+    error Crosschain__InvalidOrNotAllowedDestChains(uint64 chainId);
+    error Crosschain__InvalidChain(uint64 chainId);
+    error Crosschain__AlreadyAllowed(uint64 chainId);
+    error Crosschain__InvalidReceiverOrSender(address rcv);
+    error Crosschain__InvalidTokenOrAmount(address token, uint256 amount);
+    error Crosschain__NotEnoughBalance(uint256 bal);
 
     bytes32 private s_lastReceivedMessageId;
     string private s_lastReceivedText;
@@ -58,18 +58,18 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
     
     // -------------------------------------------------MODIFIERS-----------------------------------------------
     modifier OnlyListedChainAllowed(uint64 sourceChain, uint64 destChain) {
-       if(!s_allowedSourceChains[sourceChain]) revert Multichain__InvalidOrNotAllowedSourceChains(sourceChain);
-       if(!s_allowedDestinationChains[destChain]) revert Multichain__InvalidOrNotAllowedDestChains(destChain);
+       if(!s_allowedSourceChains[sourceChain]) revert Crosschain__InvalidOrNotAllowedSourceChains(sourceChain);
+       if(!s_allowedDestinationChains[destChain]) revert Crosschain__InvalidOrNotAllowedDestChains(destChain);
        _;
     }
 
     modifier OnlyValidReceiver(address _receiver) {
-        if(_receiver == address(0)) revert MultiChain__InvalidReceiverOrSender(_receiver);
+        if(_receiver == address(0)) revert Crosschain__InvalidReceiverOrSender(_receiver);
         _;
     }
 
     modifier OnlyValidSender(address _sender) {
-        if(_sender == address(0)) revert MultiChain__InvalidReceiverOrSender(_sender);
+        if(_sender == address(0)) revert Crosschain__InvalidReceiverOrSender(_sender);
         _;
     }
 
@@ -98,8 +98,8 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
         
         uint256 contractLinkBalance = s_linkToken.balanceOf(address(this));
 
-        if(tokenAddr == address(0) || tokenAmount == 0) revert MultiChain__InvalidTokenOrAmount(tokenAddr, tokenAmount);
-        if(tokenAmount > IERC20(tokenAddr).balanceOf(msg.sender)) revert MultiChain__NotEnoughBalance(IERC20(tokenAddr).balanceOf(msg.sender));
+        if(tokenAddr == address(0) || tokenAmount == 0) revert Crosschain__InvalidTokenOrAmount(tokenAddr, tokenAmount);
+        if(tokenAmount > IERC20(tokenAddr).balanceOf(msg.sender)) revert Crosschain__NotEnoughBalance(IERC20(tokenAddr).balanceOf(msg.sender));
 
         // send message with token from EVM to any chain
         Client.EVM2AnyMessage memory evm2AnyMessage = _buildCCIPMessage(
@@ -112,7 +112,7 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
 
         uint256 mssgFees = s_router.getFee(destChain, evm2AnyMessage);
 
-        if(mssgFees > contractLinkBalance) revert MultiChain__NotEnoughBalance(contractLinkBalance);
+        if(mssgFees > contractLinkBalance) revert Crosschain__NotEnoughBalance(contractLinkBalance);
 
         IERC20(tokenAddr).transferFrom(msg.sender, address(this), tokenAmount);
 
@@ -147,8 +147,8 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
         OnlyValidReceiver(receiver) 
         OnlyValidSender(msg.sender) returns(bytes32 msgId) {
 
-        if(token == address(0) || amount == 0) revert MultiChain__InvalidTokenOrAmount(token, amount);
-        if(amount > IERC20(token).balanceOf(msg.sender)) revert MultiChain__NotEnoughBalance(IERC20(token).balanceOf(msg.sender));
+        if(token == address(0) || amount == 0) revert Crosschain__InvalidTokenOrAmount(token, amount);
+        if(amount > IERC20(token).balanceOf(msg.sender)) revert Crosschain__NotEnoughBalance(IERC20(token).balanceOf(msg.sender));
         
           // send message with token from EVM to any chain
         Client.EVM2AnyMessage memory evm2AnyMessage = _buildCCIPMessage(
@@ -161,7 +161,7 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
 
         uint256 mssgFees = s_router.getFee(destChain, evm2AnyMessage);
 
-        if(mssgFees > address(this).balance) revert MultiChain__NotEnoughBalance(address(this).balance);
+        if(mssgFees > address(this).balance) revert Crosschain__NotEnoughBalance(address(this).balance);
 
         IERC20(token).approve(address(s_router), amount);
 
@@ -184,7 +184,7 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
     function withdrawToken(address to_, uint256 amount, address token) external {
         uint256 contractBalance = IERC20(token).balanceOf(address(this));
 
-        if(contractBalance < amount || contractBalance == 0) revert MultiChain__NotEnoughBalance(contractBalance);
+        if(contractBalance < amount || contractBalance == 0) revert Crosschain__NotEnoughBalance(contractBalance);
 
         IERC20(token).safeTransfer(to_, amount);
     }
@@ -253,8 +253,8 @@ contract Multichain is CCIPReceiver, OwnerIsCreator {
     }
 
     function _allowedChains(uint64 chainId, bool allowed, bool srcOrDest) internal {
-         if(chainId == 0) revert MultiChain__InvalidChain(chainId);
-         if(srcOrDest == allowed) revert MultiChain__AlreadyAllowed(chainId);
+         if(chainId == 0) revert Crosschain__InvalidChain(chainId);
+         if(srcOrDest == allowed) revert Crosschain__AlreadyAllowed(chainId);
          srcOrDest = allowed;
     }
 
