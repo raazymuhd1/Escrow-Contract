@@ -19,9 +19,11 @@ contract Crosschain is CCIPReceiver, OwnerIsCreator {
     error Crosschain__InvalidReceiverOrSender(address rcv);
     error Crosschain__InvalidTokenOrAmount(address token, uint256 amount);
     error Crosschain__NotEnoughBalance(uint256 bal);
+    error Crosschain__NotOwner(address caller);
 
     bytes32 private s_lastReceivedMessageId;
     string private s_lastReceivedText;
+    address private s_owner;
     IRouterClient private immutable s_router;
     IERC20 private immutable s_linkToken;
 
@@ -49,9 +51,10 @@ contract Crosschain is CCIPReceiver, OwnerIsCreator {
     );
 
 
-    constructor(address router_, address linkToken, uint256[] memory chainIds) CCIPReceiver(router_) {
+    constructor(address router_, address linkToken, address owner_) CCIPReceiver(router_) {
         s_router = IRouterClient(this.getRouter());
         s_linkToken = IERC20(linkToken);
+        s_owner = owner_;
         
     }
 
@@ -73,12 +76,17 @@ contract Crosschain is CCIPReceiver, OwnerIsCreator {
         _;
     }
 
+    modifier OnlyOwner() {
+        if(msg.sender != s_owner) revert Crosschain__NotOwner(msg.sender);
+        _;
+    }
+
      // ------------------------------------------- EXTERNAL & PUBLIC FUNCTIONS ----------------------------------------------
-    function allowedSourceChain(uint64 chainId, bool allowed) external returns(uint64) {
+    function allowedSourceChain(uint64 chainId, bool allowed) external OnlyOwner returns(uint64) {
         _allowedChains(chainId, allowed, s_allowedSourceChains[chainId]);
     }
 
-    function allowedDestChain(uint64 chainId, bool allowed) external returns(uint64) {
+    function allowedDestChain(uint64 chainId, bool allowed) external OnlyOwner returns(uint64) {
         _allowedChains(chainId, allowed, s_allowedDestinationChains[chainId]);
     }
 
