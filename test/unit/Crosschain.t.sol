@@ -43,7 +43,7 @@ contract TestCrosschain is Test {
         _;
     }
 
-    function test_InvalidReceiver() public SendFee {
+    function test_validReceiver() public SendFee {
         uint64 srcChain = 1;
         bool allowed = true;
         uint64 destChain = 96;
@@ -52,14 +52,13 @@ contract TestCrosschain is Test {
         vm.startPrank(USER);
         uint64 allowedSrcChain = crosschain.allowedSourceChain(srcChain, allowed);
         uint64 allowedDestChain = crosschain.allowedDestChain(destChain, allowed);
-
-        vm.expectRevert("Invalid Receiver");
-        crosschain.sendMessagePayWithLink(destChain, ZERO_RECEIVER, text, address(testToken), 100);
         vm.stopPrank();
 
-        // assertEq(ZERO_RECEIVER, address(0)); 
-        // assertEq(uint256(destChain), uint256(96));   
+        vm.prank(SENDER);
+        crosschain.sendMessagePayWithLink(destChain, RECEIVER, text, address(testToken), 100);
 
+        assertNotEq(RECEIVER, address(0));  
+        assertEq(RECEIVER, 100);
     }
 
 }
