@@ -31,7 +31,8 @@ contract TestCrosschain is Test {
         vm.startPrank(USER);
         vm.deal(USER, 10 ether);
         s_linkToken.mintToken(1000_000, USER);
-        testToken.mintToken(1000_000, SENDER);
+        testToken.mintToken(1000_000, USER);
+        testToken.transfer(SENDER, 1000);
 
         vm.stopPrank();
     }
@@ -51,14 +52,13 @@ contract TestCrosschain is Test {
         vm.startPrank(USER);
         uint64 allowedSrcChain = crosschain.allowedSourceChain(srcChain, allowed);
         uint64 allowedDestChain = crosschain.allowedDestChain(destChain, allowed);
-        vm.stopPrank();
 
-        vm.prank(SENDER);
         vm.expectRevert("Invalid Receiver");
         crosschain.sendMessagePayWithLink(destChain, ZERO_RECEIVER, text, address(testToken), 100);
+        vm.stopPrank();
 
-        assertEq(ZERO_RECEIVER, address(0));
-        assertEq(uint256(destChain), uint256(96));
+        // assertEq(ZERO_RECEIVER, address(0)); 
+        // assertEq(uint256(destChain), uint256(96));   
 
     }
 

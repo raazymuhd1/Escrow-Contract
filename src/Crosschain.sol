@@ -52,7 +52,7 @@ contract Crosschain is CCIPReceiver, OwnerIsCreator {
 
 
     constructor(address router_, address linkToken, address owner_) CCIPReceiver(router_) {
-        s_router = IRouterClient(this.getRouter());
+        s_router = IRouterClient(router_);
         s_linkToken = IERC20(linkToken);
         s_owner = owner_;
         

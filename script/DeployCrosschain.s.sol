@@ -10,10 +10,11 @@ contract DeployCrosschain is Script {
 
     function run(address router_, address linkToken_, address owner_) public returns(Crosschain) {
 
-        vm.broadcast();
+        vm.startBroadcast();
         crossChain = new Crosschain(router_, linkToken_, owner_);
 
         console.log(address(crossChain));
+        vm.stopBroadcast();
         return crossChain;
     }
 }
