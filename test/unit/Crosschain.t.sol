@@ -34,14 +34,14 @@ contract TestCrosschain is Test {
         vm.deal(USER, 10 ether);
         s_linkToken.mintToken(1000_000, USER);
         testToken.mintToken(1000_000, USER);
-        testToken.transfer(SENDER, 1000);
+        testToken.transfer(SENDER, 1000 * PRECISION);
 
         vm.stopPrank();
     }
 
     modifier SendFee() {
         vm.prank(USER);
-        s_linkToken.transfer(address(crosschain), 500 * PRECISION);
+        s_linkToken.transfer(address(crosschain), 5000 * PRECISION);
         _;
     }
 
@@ -49,6 +49,7 @@ contract TestCrosschain is Test {
         uint64 srcChain = 1;
         bool allowed = true;
         uint64 destChain = 96;
+        uint256 testAmount = 10 * PRECISION;
         string memory text = "got my token";
 
         vm.startPrank(USER);
@@ -57,11 +58,11 @@ contract TestCrosschain is Test {
         vm.stopPrank();
 
         vm.prank(SENDER);
-        testToken.approve(address(crosschain), 100 * PRECISION);
-        crosschain.sendMessagePayWithLink(srcChain, destChain, RECEIVER, text, address(testToken), 100 * PRECISION);
+        testToken.approve(address(crosschain), testAmount);
+        crosschain.sendMessagePayWithLink(srcChain, destChain, RECEIVER, text, address(testToken), testAmount);
 
         assertNotEq(RECEIVER, address(0));  
-        assertEq(testToken.balanceOf(RECEIVER), 100 * PRECISION);
+        assertEq(testToken.balanceOf(RECEIVER), testAmount);
     }
 
 }
