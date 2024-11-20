@@ -20,6 +20,8 @@ contract TestCrosschain is Test {
     address RECEIVER = makeAddr("RECEIVER");
     address SENDER = makeAddr("SENDER");
 
+    uint256 PRECISION = 1e18;
+
     function setUp() public {
 
         s_router = new MockRouter();
@@ -39,7 +41,7 @@ contract TestCrosschain is Test {
 
     modifier SendFee() {
         vm.prank(USER);
-        s_linkToken.transfer(address(crosschain), 500);
+        s_linkToken.transfer(address(crosschain), 500 * PRECISION);
         _;
     }
 
@@ -50,15 +52,16 @@ contract TestCrosschain is Test {
         string memory text = "got my token";
 
         vm.startPrank(USER);
-        uint64 allowedSrcChain = crosschain.allowedSourceChain(srcChain, allowed);
-        uint64 allowedDestChain = crosschain.allowedDestChain(destChain, allowed);
+        bool allowedSrcChain = crosschain.allowedSourceChain(srcChain, allowed);
+        bool allowedDestChain = crosschain.allowedDestChain(destChain, allowed);
         vm.stopPrank();
 
         vm.prank(SENDER);
-        crosschain.sendMessagePayWithLink(destChain, RECEIVER, text, address(testToken), 100);
+        testToken.approve(address(crosschain), 100 * PRECISION);
+        crosschain.sendMessagePayWithLink(srcChain, destChain, RECEIVER, text, address(testToken), 100 * PRECISION);
 
         assertNotEq(RECEIVER, address(0));  
-        assertEq(RECEIVER, 100);
+        assertEq(testToken.balanceOf(RECEIVER), 100 * PRECISION);
     }
 
 }

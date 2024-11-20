@@ -82,25 +82,26 @@ contract Crosschain is CCIPReceiver, OwnerIsCreator {
     }
 
      // ------------------------------------------- EXTERNAL & PUBLIC FUNCTIONS ----------------------------------------------
-    function allowedSourceChain(uint64 chainId, bool allowed) external OnlyOwner returns(uint64) {
-        _allowedChains(chainId, allowed, s_allowedSourceChains[chainId]);
+    function allowedSourceChain(uint64 chainId, bool allowed) external OnlyOwner returns(bool) {
+       return _allowedChains(chainId, allowed, s_allowedSourceChains[chainId], true, false);
     }
 
-    function allowedDestChain(uint64 chainId, bool allowed) external OnlyOwner returns(uint64) {
-        _allowedChains(chainId, allowed, s_allowedDestinationChains[chainId]);
+    function allowedDestChain(uint64 chainId, bool allowed) external OnlyOwner returns(bool) {
+        return _allowedChains(chainId, allowed, s_allowedDestinationChains[chainId], false, true);
     }
 
     /**
         @dev send token along with message to a dest chain
      */
     function sendMessagePayWithLink(
+        uint64 srcChain,
         uint64 destChain,
         address receiver,
         string calldata text,
         address tokenAddr,
         uint256 tokenAmount
     ) external 
-        OnlyListedChainAllowed(uint64(block.chainid), destChain) 
+        OnlyListedChainAllowed(uint64(srcChain), destChain) 
         OnlyValidReceiver(receiver) 
         OnlyValidSender(msg.sender) returns(bytes32 msgId) {
         
@@ -260,10 +261,19 @@ contract Crosschain is CCIPReceiver, OwnerIsCreator {
         );
     }
 
-    function _allowedChains(uint64 chainId, bool allowed, bool srcOrDest) internal {
+    function _allowedChains(uint64 chainId, bool allowed, bool srcOrDestAllowed, bool src, bool dest) internal returns(bool) {
          if(chainId == 0) revert Crosschain__InvalidChain(chainId);
-         if(srcOrDest == allowed) revert Crosschain__AlreadyAllowed(chainId);
-         srcOrDest = allowed;
+         if(srcOrDestAllowed) revert Crosschain__AlreadyAllowed(chainId);
+
+         if(src) {
+            s_allowedSourceChains[chainId] = allowed;
+            return s_allowedSourceChains[chainId];
+
+         } else if(dest) {
+            s_allowedDestinationChains[chainId] = allowed;
+            return s_allowedDestinationChains[chainId];
+         }
+      
     }
 
 }
