@@ -9,3 +9,8 @@
  - the type of token will be determined by the amount of token that u holding in your wallet
  - if ur amount of `ERC404` in your wallet is (1), that means u holding 1 NFT
  - if the amount of `ERC404` that u holding is (1.5 / 3.4) that means u holding 1 NFT or 3 NFT `(ERC721)` and 0.5 or 0.4 token `(ERC20)`
+
+ ### Keynote
+ - Do not store your private key in .env file, it will be very unsafe to do that
+   but store it using `cast wallet import keyName --interactive` command.
+   ex: `cast wallet import myKey --interactive`

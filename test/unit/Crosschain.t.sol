@@ -45,12 +45,15 @@ contract TestCrosschain is Test {
         _;
     }
 
+
     function test_validReceiver() public SendFee {
         uint64 srcChain = 1;
         bool allowed = true;
         uint64 destChain = 96;
         uint256 testAmount = 10 * PRECISION;
         string memory text = "got my token";
+
+        console.log(testToken.balanceOf(SENDER));
 
         vm.startPrank(USER);
         bool allowedSrcChain = crosschain.allowedSourceChain(srcChain, allowed);
@@ -63,6 +66,25 @@ contract TestCrosschain is Test {
 
         assertNotEq(RECEIVER, address(0));  
         assertEq(testToken.balanceOf(RECEIVER), testAmount);
+    }
+
+    function test_sendMsgPayNativePass() public {
+        uint64 srcChain = 1;
+        bool allowed = true;
+        uint64 destChain = 96;
+        uint256 testAmount = 10 * PRECISION;
+        string memory text = "got my token";
+
+        console.log(testToken.balanceOf(SENDER));
+
+        vm.startPrank(USER);
+        bool allowedSrcChain = crosschain.allowedSourceChain(srcChain, allowed);
+        bool allowedDestChain = crosschain.allowedDestChain(destChain, allowed);
+        vm.stopPrank();
+    }
+
+    function test_sendMsgPayLinkPass() public {
+        
     }
 
 }
