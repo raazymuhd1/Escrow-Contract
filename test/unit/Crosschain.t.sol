@@ -54,7 +54,7 @@ contract TestCrosschain is Test {
         string memory text = "got my token";
 
         console.log(testToken.balanceOf(SENDER));
-
+        
         vm.startPrank(USER);
         bool allowedSrcChain = crosschain.allowedSourceChain(srcChain, allowed);
         bool allowedDestChain = crosschain.allowedDestChain(destChain, allowed);
@@ -81,10 +81,11 @@ contract TestCrosschain is Test {
         bool allowedSrcChain = crosschain.allowedSourceChain(srcChain, allowed);
         bool allowedDestChain = crosschain.allowedDestChain(destChain, allowed);
         vm.stopPrank();
+
     }
 
     function test_sendMsgPayLinkPass() public {
-        
+        uint256 initCount = 0; // start counting as soon as possible
     }
 
 }

@@ -1,4 +1,5 @@
-pragma solidity ^0.8.17;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
 
 /**
  * @title Escrow Contract
@@ -9,14 +10,16 @@ pragma solidity ^0.8.17;
  *      It supports depositing funds into escrow, releasing funds to the developer, and refunding the client.
  *      This contract does not inherently support dispute resolution and assumes that any disputes will be resolved externally.
  */
+import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
-
-contract Escrow {
+contract Escrow is Ownable {
     // CUSTOM ERRORS
     error Escrow_NotOwner();
     error Escrow_InvalidAddress();
+    error Escrow_InvalidCaller();
     error Escrow_OpenProjectFailed();
-    error Escrow_NotEnoughFee();
+    error Escrow_NotEnoughFeeOrBudget();
     error Escrow_FundsNotRelased();
     error Escrow_ProjectNotCompletedOrCanceled();
     error Escrow_DeadlineIsOver();
@@ -24,12 +27,12 @@ contract Escrow {
     error Escrow_NoProjectOwned();
     error Escrow_ProjectNotOverYet();
     error Escrow_RefundFailed();
+    error Escrow_ReleasingFundFailed();
     error Escrow_BudgetDepositFailed();
     error Escrow_ProjectHasBeenCompleted();
 
     // ---------------- STATE VARIABLES ---------------------
    uint256 private constant ESCROW_FEE = 0.02 ether;
-   address private s_owner;
 
     // ------------------- MAPPINGS ------------------------
    mapping(address projectOwner => Project) private s_project;
@@ -40,14 +43,13 @@ contract Escrow {
    event ProjectStarted(address owner, ProjectState state);
    event ProjectHasBeenRefunded(address projectOwner, uint256 budget);
 
-   constructor(address _owner) {
-      s_owner = _owner;
+   constructor(address _intialOwner_) Ownable(_intialOwner_) {
    }
 
     receive() external payable {}
     // fallback() external payable {}
 
-    // ------------------ STRUCT ------------------------
+    // ----------------------------------------- STRUCTs ------------------------------------------------------
    struct Project {
        bytes32 projectId;
        address payable owner;
@@ -59,19 +61,24 @@ contract Escrow {
        ProjectState state;
    }
 
+     // ----------------------------------------- ENUMs ------------------------------------------------------
    enum ProjectState {
        Completed,
        Canceled,
        Started
    } 
 
-    // MODIFIERS ***********************
+     // ----------------------------------------- MODIFIERs ------------------------------------------------------
    modifier StateCompleted() {
       Project memory project = getProjectByOwner(msg.sender);
       if(project.state != ProjectState.Completed || project.state == ProjectState.Canceled) revert Escrow_ProjectNotCompletedOrCanceled();
       _;
    }
    
+   modifier InvalidCaller() {
+      if(msg.sender == address(0)) revert Escrow_InvalidCaller();
+      _;
+   }
 
     // ----------------------- EXTERNAL & INTERNAL ---------------------------
 
@@ -83,8 +90,8 @@ contract Escrow {
           developer: payable(projectDetails.developer),
           title: projectDetails.title,
           description: projectDetails.description,
-          budget: projectDetails.budget,
-          deadline: projectDetails.deadline,
+          budget: msg.value - ESCROW_FEE,
+          deadline: block.timestamp,
           state: projectDetails.state
        });
 
@@ -97,12 +104,18 @@ contract Escrow {
         @return Project - returns the project that was created
      */
 
-   function openProject(Project calldata projectDetails) external payable returns(bool, Project memory) {
-       uint256 projectBudget = projectDetails.budget + ESCROW_FEE;
-       if(msg.value <= 0 || msg.value < projectBudget) revert Escrow_NotEnoughFee();
+    /**
+        @dev user will have to deposit the budget using native token (ETH, BNB, etc)
+        @param projectDetails - a project details in struct format
+        @return bool - true/false
+        @return Project - return a project created
+     */
+   function openProject(Project calldata projectDetails) external payable InvalidCaller returns(bool, Project memory) {
+    //    uint256 expectedTobeDeposited = projectDetails.budget + ESCROW_FEE;
+       if(msg.value <= 0) revert Escrow_NotEnoughFeeOrBudget();
        if(msg.sender == address(0)) revert Escrow_InvalidAddress();
-      // deposit budget
-      (bool deposited, ) = payable(address(this)).call{value: projectBudget}("");  
+      // deposit budget into this contract
+      (bool deposited, ) = payable(address(this)).call{value: msg.value + ESCROW_FEE}("");  
        
        if(!deposited) revert Escrow_BudgetDepositFailed();
 
@@ -127,21 +140,24 @@ contract Escrow {
 
     /**
      * @dev this function only can be call by contract owner to release the project funds after client confirm that project is completed
-     * @param owner_ - project owner address
+     * @param projectOwner_ - project owner address
      */
-   function releaseFunds(address owner_, address dev_) external payable StateCompleted returns(bool released) {
-       Project memory project = getProjectByOwner(owner_); 
+   function releaseFunds(address projectOwner_, address dev_) external payable StateCompleted returns(bool released) {
+       Project memory project = getProjectByOwner(projectOwner_); 
        bool fundReleased;
 
        if(_isDeadlineOver(project) == true) revert Escrow_DeadlineIsOver();
-       if(project.budget != 0 && owner_ != address(0) && msg.sender == project.owner) { 
+       if(project.budget != 0 && projectOwner_ != address(0) && msg.sender == project.owner) { 
            ( fundReleased, ) = payable(dev_).call{value: project.budget}("");
-         //   resetting project's budget
-           project.budget = 0;
+
+           if(!fundReleased) revert Escrow_ReleasingFundFailed();
+         //   resetting project's budget to zerp
+           s_project[projectOwner_].budget = 0;
+
            emit FundReleased(dev_, project.budget);
+           released = fundReleased;
        }
 
-       if(!fundReleased) revert Escrow_FundsNotRelased();
        released = fundReleased;
    }
 
