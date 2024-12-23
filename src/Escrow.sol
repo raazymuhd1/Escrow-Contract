@@ -122,7 +122,7 @@ contract Escrow is Ownable {
        if(!deposited) revert Escrow_BudgetDepositFailed();
 
         // assigns a project 
-       s_project[msg.sender] = _assignProject(projectDetails);
+       s_ownerOfproject[msg.sender][projectDetails.projectId] = _assignProject(projectDetails);
        emit ProjectCreated(msg.sender, s_project[msg.sender]); 
        return (true, s_project[msg.sender]);
    }
@@ -144,10 +144,12 @@ contract Escrow is Ownable {
      * @dev this function only can be call by contract owner to release the project funds after client confirm that project is completed
      * @param projectOwner_ - project owner address
      */
-   function releaseFunds(address projectOwner_, address dev_) external payable StateCompleted returns(bool released) {
-       Project memory project = getProjectByOwner(projectOwner_); 
+   function releaseFunds(address projectOwner_, bytes32 projectId, address dev_) external payable StateCompleted returns(bool released) {
+       Project memory project = getProjectById(projectOwner_, projectId);
+       ProjectState memory projectState = checkProjectCurrentState(projectOwner_, projectId); 
        bool fundReleased;
 
+       if(projectState != ProjectState.Completed) revert("project is not completed yet");
        if(_isDeadlineOver(project)) revert Escrow_DeadlineIsOver();
        if(project.budget != 0 && projectOwner_ != address(0) && msg.sender == project.owner) { 
            ( fundReleased, ) = payable(dev_).call{value: project.budget}("");
@@ -155,7 +157,7 @@ contract Escrow is Ownable {
          //   resetting project's budget to zerp
            emit FundReleased(dev_, project.budget);
         //    deleting completed project
-           delete s_project[projectOwner_];
+           delete s_ownerOfproject[projectOwner_][projectId];
            released = fundReleased;
        }
 
@@ -165,28 +167,28 @@ contract Escrow is Ownable {
     /**
     @dev only the project owner can confirm that the project is actually completed, non-project owner is not allowed to call this function
      */
-   function confirmProjectIsCompleted() external returns(bool confirmed) {
-        Project memory project = getProjectByOwner(msg.sender);
+   function confirmProjectIsCompleted(bytes32 projectId) external returns(bool confirmed) {
+        Project memory project = getProjectById(msg.sender, projectId);
         if(msg.sender != project.owner) revert Escrow_NotProjectsOwner();
         if(project.state == ProjectState.Completed || project.state == ProjecState.Cancelled) {
             revert Escrow_ProjectHasBeenCompletedOrCancelled();
             confirmed = false;
         }
-
-        project.state = ProjectState.Completed;
+        s_ownerOfProject[projectOwner_][projectId].state = ProjectState.Completed;
         confirmed = true;
    }
 
    /**
    @dev this function only callable by this contract's owner, after solving the disputement between client and developer if any, client or dev is not allowed to execute this function, this preventing client from cancelling the project at any moment they wish.
     */
-   function cancelAndRefund(address projectOwner_, string memory cancelReason) external returns(bool refunded) {
-       Project memory project = getProjectByOwner(projectOwner_);
+   function cancelAndRefund(address projectOwner_, bytes32 projectId, string memory cancelReason) external returns(bool refunded) {
+       Project memory project = getProjectById(projectOwner_, projectId);
        if(project.owner == address(0)) revert Escrow_InvalidOwner();
        project.budget = 0;
        ( refunded, ) = project.owner.call{value: project.budget}("");
        
        if(!refunded) revert Escrow_RefundFailed();
+       s_ownerOfProject[projectOwner_][projectId].state = ProjectState.Cancelled;
        emit ProjectHasBeenRefunded(project.owner, project.budget);
        delete s_project[projectOwner_];
        refunded;
@@ -212,6 +214,11 @@ contract Escrow is Ownable {
      */
    function getBalance() external view returns(uint256 balance) {
       balance = address(this).balance;
+   }
+
+   function checkProjectCurrentState(address projectOwner, bytes32 projectId) internal returns(ProjectState memory) {
+       ProjectState memory state =  s_ownerOfProject[projectOwner][projectId];
+       return state;
    }
 
    function getProjectById(address _projectOwner, bytes32 projectId) public view returns(Project memory project) {
