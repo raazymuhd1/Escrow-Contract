@@ -15,27 +15,28 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Escrow is Ownable {
     // CUSTOM ERRORS
-    error Escrow_NotOwner();
     error Escrow_InvalidAddress();
     error Escrow_InvalidCaller();
+    error Escrow_ProjectStillRunning();
+    error Escrow_NoProjectWithThatId();
+    error Escrow_InvalidOwner();
     error Escrow_OpenProjectFailed();
     error Escrow_NotEnoughFeeOrBudget();
     error Escrow_FundsNotRelased();
     error Escrow_ProjectNotCompletedOrCanceled();
     error Escrow_DeadlineIsOver();
     error Escrow_NotProjectsOwner();
-    error Escrow_NoProjectOwned();
     error Escrow_ProjectNotOverYet();
     error Escrow_RefundFailed();
     error Escrow_ReleasingFundFailed();
     error Escrow_BudgetDepositFailed();
-    error Escrow_ProjectHasBeenCompleted();
+    error Escrow_ProjectHasBeenCompletedOrCancelled();
 
     // ---------------- STATE VARIABLES ---------------------
    uint256 private constant ESCROW_FEE = 0.02 ether;
 
     // ------------------- MAPPINGS ------------------------
-   mapping(address projectOwner => Project) private s_project;
+   mapping(address projectOwner => mapping(bytes32 projectId => Project)) private s_ownerOfproject;
 
 //   ----------------------- EVENTS --------------------------
    event ProjectCreated(address indexed owner_, Project indexed project);
@@ -65,7 +66,8 @@ contract Escrow is Ownable {
    enum ProjectState {
        Completed,
        Canceled,
-       Started
+       Started,
+       Paused
    } 
 
      // ----------------------------------------- MODIFIERs ------------------------------------------------------
@@ -146,26 +148,28 @@ contract Escrow is Ownable {
        Project memory project = getProjectByOwner(projectOwner_); 
        bool fundReleased;
 
-       if(_isDeadlineOver(project) == true) revert Escrow_DeadlineIsOver();
+       if(_isDeadlineOver(project)) revert Escrow_DeadlineIsOver();
        if(project.budget != 0 && projectOwner_ != address(0) && msg.sender == project.owner) { 
            ( fundReleased, ) = payable(dev_).call{value: project.budget}("");
-
            if(!fundReleased) revert Escrow_ReleasingFundFailed();
          //   resetting project's budget to zerp
-           s_project[projectOwner_].budget = 0;
-
            emit FundReleased(dev_, project.budget);
+        //    deleting completed project
+           delete s_project[projectOwner_];
            released = fundReleased;
        }
 
        released = fundReleased;
    }
 
+    /**
+    @dev only the project owner can confirm that the project is actually completed, non-project owner is not allowed to call this function
+     */
    function confirmProjectIsCompleted() external returns(bool confirmed) {
         Project memory project = getProjectByOwner(msg.sender);
-        if(msg.sender != project.owner) revert Escrow_NotOwner();
-        if(project.state == ProjectState.Completed) {
-            revert Escrow_ProjectHasBeenCompleted();
+        if(msg.sender != project.owner) revert Escrow_NotProjectsOwner();
+        if(project.state == ProjectState.Completed || project.state == ProjecState.Cancelled) {
+            revert Escrow_ProjectHasBeenCompletedOrCancelled();
             confirmed = false;
         }
 
@@ -173,21 +177,29 @@ contract Escrow is Ownable {
         confirmed = true;
    }
 
-   
-   function cancelAndRefund() external returns(bool refunded) {
-       Project memory project = getProjectByOwner(msg.sender);
-       if(project.owner == address(0)) revert Escrow_NoProjectOwned();
-       if(block.timestamp < project.deadline || project.state == ProjectState.Completed) revert Escrow_ProjectNotOverYet();
+   /**
+   @dev this function only callable by this contract's owner, after solving the disputement between client and developer if any, client or dev is not allowed to execute this function, this preventing client from cancelling the project at any moment they wish.
+    */
+   function cancelAndRefund(address projectOwner_, string memory cancelReason) external returns(bool refunded) {
+       Project memory project = getProjectByOwner(projectOwner_);
+       if(project.owner == address(0)) revert Escrow_InvalidOwner();
        project.budget = 0;
        ( refunded, ) = project.owner.call{value: project.budget}("");
        
        if(!refunded) revert Escrow_RefundFailed();
        emit ProjectHasBeenRefunded(project.owner, project.budget);
+       delete s_project[projectOwner_];
        refunded;
    }
 
-   function setState() external returns(bool stateSet) {
-      Project memory project = s_project[msg.sender];
+   /**
+    @dev only project owner can unPause the project
+    */
+   function unPauseProject(bytes32 projectId) external returns(bool stateSet) {
+      Project memory project = s_ownerOfProject[msg.sender][projectId];
+      
+      if(project.state != ProjectState.Paused) revert Escrow_ProjectStillRunning();
+      if(projectId == bytes32(0) || project.projectId == bytes32(0)) revert Escrow_NoProjectWithThatId();
       if(msg.sender != project.owner) revert Escrow_NotProjectsOwner();
 
       project.state = ProjectState.Started;
@@ -202,17 +214,17 @@ contract Escrow is Ownable {
       balance = address(this).balance;
    }
 
-   function getProjectByOwner(address _owner) public view returns(Project memory project) {
-       project = s_project[_owner];
+   function getProjectById(address _projectOwner, bytes32 projectId) public view returns(Project memory project) {
+       project = s_ownerOfProject[_projectOwner][projectId];
    }
 
-   function getProjectBudgets() external view returns(uint256 budget_) {
-      Project memory project = getProjectByOwner(msg.sender);
+   function getProjectBudgets(bytes32 projectId) external view returns(uint256 budget_) {
+      Project memory project = getProjectById(msg.sender, projectId);
       budget_ = project.budget;
    }
 
-  function geProjectState() public view returns(ProjectState state) {
-    Project memory _project = s_project[msg.sender];
+  function geProjectState(bytes32 projectId) public view returns(ProjectState state) {
+    Project memory _project = s_ownerOfProject[msg.sender][projectId];
     state = _project.state;
   }
 
